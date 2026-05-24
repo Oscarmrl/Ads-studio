@@ -36,6 +36,7 @@ ad-studio/
 Edita `.env.local`:
 ```
 ELEVENLABS_API_KEY=tu_key_aqui
+ANTHROPIC_API_KEY=tu_key_aqui
 ```
 
 ## Importar configs del pipeline anterior
