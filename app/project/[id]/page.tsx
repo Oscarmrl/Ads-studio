@@ -396,10 +396,10 @@ export default function ProjectEditor({ params }: { params: Promise<{ id: string
           </div>
 
           {/* 2-column grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, padding: '28px 32px', maxWidth: 1400 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, padding: '28px 32px', maxWidth: 1400, overflow: 'hidden' }}>
 
             {/* ══ LEFT COLUMN ══════════════════════════════════════ */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
 
               {/* HTML selector */}
               <div style={{ ...T.card, ...T.section }}>
@@ -482,7 +482,7 @@ export default function ProjectEditor({ params }: { params: Promise<{ id: string
             </div>
 
             {/* ══ RIGHT COLUMN ═════════════════════════════════════ */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
 
               {/* ── AI Workflow panel ──────────────────────────── */}
               <AiPanel
