@@ -12,12 +12,15 @@ interface Project {
   id: string; name: string; html: string;
   duration: number; width: number; height: number;
   voice: AudioCue[]; sfx: AudioCue[];
-  lastOutput?: string; updatedAt: string;
+  mobileOutput?: string;
+  desktopOutput?: string;
+  lastOutput?: string;
+  updatedAt: string;
 }
 interface RenderState {
   jobId: string;
   status: 'pending' | 'recording' | 'mixing' | 'done' | 'error';
-  progress: number; outputFile?: string; error?: string;
+  progress: number; outputFile?: string; desktopFile?: string; error?: string;
 }
 
 /* ── Shared styles ─────────────────────────────────────────── */
@@ -85,7 +88,7 @@ export default function Dashboard() {
     const es = new EventSource(`/api/render/${jobId}`);
     es.onmessage = (e) => {
       const job = JSON.parse(e.data);
-      setRenders(prev => ({ ...prev, [projectId]: { jobId, status: job.status, progress: job.progress, outputFile: job.outputFile, error: job.error } }));
+      setRenders(prev => ({ ...prev, [projectId]: { jobId, status: job.status, progress: job.progress, outputFile: job.outputFile, desktopFile: job.desktopFile, error: job.error } }));
       if (job.status === 'done' || job.status === 'error') { es.close(); if (job.status === 'done') fetchProjects(); }
     };
     es.onerror = () => es.close();
@@ -200,10 +203,12 @@ export default function Dashboard() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
             {projects.map((p, idx) => {
               const render = renders[p.id];
-              const inProgress = render && render.status !== 'done' && render.status !== 'error';
-              const hasOutput  = render?.outputFile || p.lastOutput;
+              const inProgress   = render && render.status !== 'done' && render.status !== 'error';
+              const mobileOut    = render?.outputFile  || p.mobileOutput  || p.lastOutput;
+              const desktopOut   = render?.desktopFile || p.desktopOutput;
+              const hasOutput    = !!(mobileOut || desktopOut);
               // Cada 5to proyecto usa dark card (como el de referencia)
-              const isDark     = idx % 5 === 4 || render?.status === 'done';
+              const isDark       = idx % 5 === 4 || render?.status === 'done';
 
               return isDark && !inProgress && render?.status !== 'error' ? (
                 /* ── Dark Card ─────────────────────────────── */
@@ -220,17 +225,28 @@ export default function Dashboard() {
                     <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Volume2 size={11} />{p.sfx.length}</span>
                   </div>
                   {hasOutput && (
-                    <a href={`/api/outputs/${render?.outputFile || p.lastOutput}`} target="_blank" rel="noreferrer"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 7,
-                        padding: '9px 14px', marginBottom: 12,
-                        background: 'rgba(255,255,255,0.08)', borderRadius: 8,
-                        fontSize: 12, color: '#aaa', textDecoration: 'none', fontWeight: 600,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                      <Play size={11} style={{ flexShrink: 0 }} />
-                      {render?.outputFile || p.lastOutput}
-                    </a>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                      {mobileOut && (
+                        <a href={`/api/outputs/${mobileOut}`} target="_blank" rel="noreferrer"
+                          style={{
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '7px 10px', background: 'rgba(255,255,255,0.08)',
+                            borderRadius: 7, fontSize: 11, color: '#aaa', textDecoration: 'none', fontWeight: 600,
+                          }}>
+                          <Download size={11} /> 📱 Mobile
+                        </a>
+                      )}
+                      {desktopOut && (
+                        <a href={`/api/outputs/${desktopOut}`} target="_blank" rel="noreferrer"
+                          style={{
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '7px 10px', background: 'rgba(255,255,255,0.08)',
+                            borderRadius: 7, fontSize: 11, color: '#aaa', textDecoration: 'none', fontWeight: 600,
+                          }}>
+                          <Download size={11} /> 🖥️ Desktop
+                        </a>
+                      )}
+                    </div>
                   )}
                   <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
                     <Link href={`/project/${p.id}`}
@@ -315,20 +331,34 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {/* Output */}
+                  {/* Outputs mobile + desktop */}
                   {hasOutput && !inProgress && render?.status !== 'error' && (
-                    <a href={`/api/outputs/${render?.outputFile || p.lastOutput}`} target="_blank" rel="noreferrer"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 7,
-                        padding: '8px 12px', marginBottom: 12,
-                        background: '#F0F7F0', border: '1.5px solid #BBE0BB',
-                        borderRadius: 8, fontSize: 12, color: '#16A34A',
-                        textDecoration: 'none', fontWeight: 600,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                      <Download size={12} style={{ flexShrink: 0 }} />
-                      {render?.outputFile || p.lastOutput}
-                    </a>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                      {mobileOut && (
+                        <a href={`/api/outputs/${mobileOut}`} target="_blank" rel="noreferrer"
+                          style={{
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '7px 10px',
+                            background: '#F0F7F0', border: '1.5px solid #BBE0BB',
+                            borderRadius: 7, fontSize: 11, color: '#16A34A',
+                            textDecoration: 'none', fontWeight: 600,
+                          }}>
+                          <Download size={11} /> 📱 Mobile
+                        </a>
+                      )}
+                      {desktopOut && (
+                        <a href={`/api/outputs/${desktopOut}`} target="_blank" rel="noreferrer"
+                          style={{
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '7px 10px',
+                            background: '#F0F7F0', border: '1.5px solid #BBE0BB',
+                            borderRadius: 7, fontSize: 11, color: '#16A34A',
+                            textDecoration: 'none', fontWeight: 600,
+                          }}>
+                          <Download size={11} /> 🖥️ Desktop
+                        </a>
+                      )}
+                    </div>
                   )}
 
                   {/* Actions */}

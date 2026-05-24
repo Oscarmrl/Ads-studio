@@ -45,11 +45,13 @@ interface Project {
   id: string; name: string; html: string;
   duration: number; width: number; height: number;
   voice: AudioCue[]; sfx: AudioCue[];
+  mobileOutput?: string;
+  desktopOutput?: string;
   lastOutput?: string;
 }
 interface RenderState {
   jobId: string; status: string; progress: number;
-  logs: string[]; outputFile?: string; error?: string;
+  logs: string[]; outputFile?: string; desktopFile?: string; error?: string;
 }
 interface VoiceOption   { voiceId: string; name: string; previewUrl: string; filename: string; }
 interface SfxSuggestion { at: number; src: string; vol: number; }
@@ -249,7 +251,7 @@ export default function ProjectEditor({ params }: { params: Promise<{ id: string
     const es = new EventSource(`/api/render/${jobId}`);
     es.onmessage = (e) => {
       const job = JSON.parse(e.data);
-      setRender({ jobId, status: job.status, progress: job.progress, logs: job.logs, outputFile: job.outputFile, error: job.error });
+      setRender({ jobId, status: job.status, progress: job.progress, logs: job.logs, outputFile: job.outputFile, desktopFile: job.desktopFile, error: job.error });
       if (job.status === 'done' || job.status === 'error') es.close();
     };
     es.onerror = () => es.close();
@@ -557,12 +559,24 @@ export default function ProjectEditor({ params }: { params: Promise<{ id: string
                         }}>{l}</div>
                       ))}
                     </div>
+                    {/* Mobile output — 1080×1920 */}
                     {render.outputFile && (
                       <VideoPlayer
                         src={`/api/outputs/${render.outputFile}`}
                         filename={render.outputFile}
-                        width={project.width}
-                        height={project.height}
+                        label="📱 Mobile"
+                        dims="1080 × 1920"
+                        dark
+                      />
+                    )}
+                    {/* Desktop output — 1080×1080 */}
+                    {render.desktopFile && (
+                      <VideoPlayer
+                        src={`/api/outputs/${render.desktopFile}`}
+                        filename={render.desktopFile}
+                        label="🖥️ Desktop"
+                        dims="1080 × 1080"
+                        dark
                       />
                     )}
                   </div>
@@ -978,61 +992,69 @@ function SummaryRow({ icon, label, value, dark }: { icon: React.ReactNode; label
 }
 
 /* ── Video Player ────────────────────────────────────────────────── */
-function VideoPlayer({ src, filename, width, height }: {
-  src: string; filename: string; width: number; height: number;
+function VideoPlayer({ src, filename, label, dims, dark }: {
+  src: string; filename: string;
+  label?: string; dims?: string; dark?: boolean;
 }) {
-  const aspect = width && height ? `${width} / ${height}` : '16 / 9';
+  // Detecta aspect ratio del nombre: _mobile = 9:16, _desktop = 1:1
+  const aspect = filename.includes('_mobile') ? '9 / 16'
+               : filename.includes('_desktop') ? '1 / 1'
+               : '1 / 1';
+
+  const bg = dark ? '#1E1E1E' : '#000';
+  const borderColor = dark ? '#2A2A2A' : '#111';
+
   return (
     <div style={{ marginTop: 14, animation: 'fadeIn 0.3s ease' }}>
-      {/* Video */}
+      {/* Header con label */}
+      {label && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: 8,
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: dark ? '#ccc' : '#111' }}>
+            {label}
+          </span>
+          {dims && (
+            <span style={{ fontSize: 11, color: '#666' }}>{dims} px</span>
+          )}
+        </div>
+      )}
+
+      {/* Video — max-height para que no desborde en formato story */}
       <div style={{
-        borderRadius: 8, overflow: 'hidden', background: '#000',
-        aspectRatio: aspect, width: '100%',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.18)',
+        borderRadius: 8, overflow: 'hidden', background: bg,
+        border: `1px solid ${borderColor}`,
+        aspectRatio: aspect,
+        width: '100%',
+        maxHeight: 320,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <video
           key={src}
           src={src}
           controls
-          autoPlay
           style={{ width: '100%', height: '100%', display: 'block', objectFit: 'contain' }}
         />
       </div>
 
-      {/* Footer: info + download */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginTop: 10, gap: 10,
-      }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{
-            fontSize: 12, fontWeight: 700, color: '#fff',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {filename}
-          </div>
-          {width && height && (
-            <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
-              {width} × {height} px
-            </div>
-          )}
-        </div>
-        <a
-          href={src}
-          download={filename}
-          style={{
-            flexShrink: 0,
-            background: '#252525', color: '#e0e0e0',
-            border: '1px solid #333', borderRadius: 7,
-            padding: '7px 14px', fontSize: 12, fontWeight: 600,
-            textDecoration: 'none', whiteSpace: 'nowrap',
-            transition: 'background 0.15s',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}
-        >
-          <Download size={13} /> Descargar
-        </a>
-      </div>
+      {/* Descarga */}
+      <a
+        href={src}
+        download={filename}
+        style={{
+          marginTop: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          background: dark ? '#252525' : '#F5F5F8',
+          color: dark ? '#e0e0e0' : '#333',
+          border: `1px solid ${dark ? '#333' : '#E4E4E9'}`,
+          borderRadius: 7, padding: '7px 14px',
+          fontSize: 12, fontWeight: 600,
+          textDecoration: 'none', whiteSpace: 'nowrap',
+        }}
+      >
+        <Download size={13} /> Descargar {label}
+      </a>
     </div>
   );
 }

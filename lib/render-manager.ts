@@ -8,8 +8,9 @@ export interface RenderJob {
   projectId: string;
   status: RenderStatus;
   logs: string[];
-  progress: number;   // 0-100
-  outputFile?: string;
+  progress: number;    // 0-100
+  outputFile?: string; // MP4 mobile  (1080×1920)
+  desktopFile?: string;// MP4 desktop (1080×1080)
   error?: string;
   startedAt: number;
 }

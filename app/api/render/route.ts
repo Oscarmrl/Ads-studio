@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { getProject, updateProject } from '@/lib/store';
 import { createJob, updateJob, pushLog } from '@/lib/render-manager';
 import { runPipeline } from '@/engine/pipeline';
-import path from 'path';
 
 export async function POST(req: NextRequest) {
   const { projectId } = await req.json();
@@ -21,7 +20,7 @@ export async function POST(req: NextRequest) {
       updateJob(jobId, { status: 'recording', progress: 5 });
       const baseDir = process.cwd();
 
-      const outputFile = await runPipeline({
+      const { mobileFile, desktopFile } = await runPipeline({
         config: {
           html:     project.html,
           duration: project.duration,
@@ -33,11 +32,14 @@ export async function POST(req: NextRequest) {
         baseDir,
         onProgress: (step, detail) => {
           let progress = 10;
-          if (step === 'record') progress = 30;
-          if (detail.includes('Grabando')) progress = 50;
-          if (step === 'mix')    progress = 80;
-          if (step === 'done')   progress = 100;
+          if (step === 'record')                        progress = 20;
+          if (detail.includes('Grabando'))              progress = 45;
+          if (step === 'mix' && detail.includes('2/3')) progress = 60;
+          if (step === 'mix' && detail.includes('3/3')) progress = 80;
+          if (step === 'done')                          progress = 100;
+
           pushLog(jobId, `[${step}] ${detail}`, progress);
+
           if (step === 'record' && detail.includes('Grabando')) {
             updateJob(jobId, { status: 'recording' });
           }
@@ -47,9 +49,17 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const outputName = path.basename(outputFile);
-      updateProject(projectId, { lastOutput: outputName });
-      updateJob(jobId, { status: 'done', progress: 100, outputFile: outputName });
+      updateProject(projectId, {
+        mobileOutput:  mobileFile,
+        desktopOutput: desktopFile,
+        lastOutput:    mobileFile,   // compatibilidad con proyectos anteriores
+      });
+      updateJob(jobId, {
+        status:      'done',
+        progress:    100,
+        outputFile:  mobileFile,
+        desktopFile: desktopFile,
+      });
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

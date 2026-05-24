@@ -20,7 +20,9 @@ export interface Project {
   height: number;
   voice: AudioCue[];
   sfx: AudioCue[];
-  lastOutput?: string;  // nombre del MP4 en data/outputs/
+  mobileOutput?: string;  // MP4 1080×1920 (Story / mobile)
+  desktopOutput?: string; // MP4 1080×1080 (Feed / desktop)
+  lastOutput?: string;    // alias de mobileOutput (compatibilidad)
   createdAt: string;
   updatedAt: string;
 }

@@ -19,6 +19,9 @@ export interface MixOptions {
   videoOffset?: number;
   voice?: AudioCue[];
   sfx?: AudioCue[];
+  /** Resolución de salida. Si se omite, mantiene las dimensiones del video fuente. */
+  outputWidth?: number;
+  outputHeight?: number;
   onProgress?: (msg: string) => void;
 }
 
@@ -30,6 +33,8 @@ export function mix({
   videoOffset = 0,
   voice = [],
   sfx = [],
+  outputWidth,
+  outputHeight,
   onProgress = console.log,
 }: MixOptions): string {
   const absVideo  = path.resolve(videoPath);
@@ -38,6 +43,13 @@ export function mix({
   // Redondeamos a 3 decimales para el filtro FFmpeg
   const trimStart = Math.max(0, parseFloat(videoOffset.toFixed(3)));
   const hasTrim   = trimStart > 0;
+
+  // Filtro de escala + letterbox si se especifica resolución de salida
+  // lanczos para upscale de calidad; force_original_aspect_ratio=decrease + pad = letterbox sin deformar
+  const hasScale = !!(outputWidth && outputHeight);
+  const scaleFilter = hasScale
+    ? `scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,pad=${outputWidth}:${outputHeight}:(ow-iw)/2:(oh-ih)/2:color=black`
+    : null;
 
   const allCues = [
     ...voice.map(c => ({ at: c.at, src: path.resolve(baseDir, c.src), vol: c.vol ?? 0.92 })),
@@ -48,10 +60,11 @@ export function mix({
 
   // ── Sin audio ─────────────────────────────────────────────────────────────
   if (allCues.length === 0) {
-    if (hasTrim) {
-      args.push('-vf', `trim=start=${trimStart},setpts=PTS-STARTPTS`);
-    }
-    if (duration) args.push('-t', String(duration));
+    const vf: string[] = [];
+    if (hasTrim)    vf.push(`trim=start=${trimStart},setpts=PTS-STARTPTS`);
+    if (scaleFilter) vf.push(scaleFilter);
+    if (vf.length)  args.push('-vf', vf.join(','));
+    if (duration)   args.push('-t', String(duration));
     args.push('-c:v', 'libx264', '-crf', '18', '-preset', 'fast',
               '-movflags', '+faststart', absOutput);
     run(args);
@@ -69,20 +82,20 @@ export function mix({
   const filterParts: string[] = [];
   const labels: string[] = [];
 
-  // Recorte del video si hay blank inicial
+  // Video: trim + scale en una cadena de filtros
+  const vFilters: string[] = [];
+  if (hasTrim)    vFilters.push(`trim=start=${trimStart},setpts=PTS-STARTPTS`);
+  if (scaleFilter) vFilters.push(scaleFilter);
+
   let videoMapLabel = '0:v';
-  if (hasTrim) {
-    filterParts.push(
-      `[0:v]trim=start=${trimStart},setpts=PTS-STARTPTS[vtrimmed]`
-    );
-    videoMapLabel = '[vtrimmed]';
+  if (vFilters.length) {
+    filterParts.push(`[0:v]${vFilters.join(',')}[vout]`);
+    videoMapLabel = '[vout]';
   }
 
-  // Filtros de audio (adelay ajustado para compensar el recorte del video)
+  // Filtros de audio
   allCues.forEach((cue, i) => {
     const inputIdx = i + 1;
-    // adelay ya incluye el offset de la cue; el video se recorta,
-    // así que los tiempos de audio quedan en sincronía natural.
     const delayMs  = Math.round(cue.at * 1000);
     const label    = `a${i}`;
     filterParts.push(
@@ -109,7 +122,8 @@ export function mix({
 
   args.push(...outputArgs);
 
-  onProgress(`  Mezclando ${n} pistas de audio (recortando ${trimStart}s de blank)...`);
+  const fmt = hasScale ? ` → ${outputWidth}×${outputHeight}` : '';
+  onProgress(`  Mezclando ${n} pistas de audio${fmt} (recortando ${trimStart}s de blank)...`);
   run(args);
   onProgress(`  MP4 guardado: ${path.basename(absOutput)}`);
   return absOutput;

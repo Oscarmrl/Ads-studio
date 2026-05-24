@@ -1,9 +1,13 @@
-// engine/pipeline.ts — orquestador: HTML → video raw → MP4 final
+// engine/pipeline.ts — orquestador: HTML → video raw → MP4 mobile + desktop
 import path from 'path';
 import fs from 'fs';
 import { record } from './record';
 import { mix } from './mix';
 import type { AudioCue } from './mix';
+
+// Resoluciones estándar de exportación
+const FORMAT_MOBILE  = { width: 1080, height: 1920, label: 'mobile',  tag: '📱 1080×1920' };
+const FORMAT_DESKTOP = { width: 1080, height: 1080, label: 'desktop', tag: '🖥️ 1080×1080' };
 
 export interface PipelineConfig {
   html: string;       // ruta al HTML (relativa al baseDir o absoluta)
@@ -14,19 +18,22 @@ export interface PipelineConfig {
   sfx?: AudioCue[];
 }
 
+export interface PipelineResult {
+  mobileFile: string;   // nombre del MP4 mobile  (1080×1920)
+  desktopFile: string;  // nombre del MP4 desktop (1080×1080)
+}
+
 export interface PipelineOptions {
   config: PipelineConfig;
   baseDir: string;    // directorio raíz del proyecto (donde están uploads/, data/)
-  outputPath?: string;
   onProgress?: (step: string, detail: string) => void;
 }
 
 export async function runPipeline({
   config,
   baseDir,
-  outputPath,
   onProgress = (s, d) => console.log(`[${s}] ${d}`),
-}: PipelineOptions): Promise<string> {
+}: PipelineOptions): Promise<PipelineResult> {
 
   const htmlPath  = path.isAbsolute(config.html)
     ? config.html
@@ -35,42 +42,66 @@ export async function runPipeline({
   const baseName  = path.basename(config.html, '.html');
   const outputDir = path.join(baseDir, 'data', 'outputs');
   const rawVideo  = path.join(outputDir, `${baseName}_raw_${Date.now()}.webm`);
-  const finalMp4  = outputPath || path.join(outputDir, `${baseName}.mp4`);
 
   fs.mkdirSync(outputDir, { recursive: true });
 
   onProgress('info', `▶ Pipeline: ${path.basename(config.html)}`);
   onProgress('info', `  Duración: ${config.duration}s`);
   onProgress('info', `  Voz: ${(config.voice || []).length} pistas | SFX: ${(config.sfx || []).length} cues`);
+  onProgress('info', `  Tamaño fuente: ${config.width || 1080}×${config.height || 1080}px`);
 
-  // ── Paso 1: grabar video ───────────────────────────────────────────────────
-  onProgress('record', 'Paso 1/2 — Grabando video con Playwright...');
+  // ── Paso 1: grabar en las dimensiones nativas del HTML ─────────────────────
+  // Grabando al tamaño exacto del HTML garantiza que la animación llene
+  // el viewport completamente sin barras negras. FFmpeg escala después.
+  onProgress('record', 'Paso 1/3 — Grabando video con Playwright...');
   const { blankSeconds } = await record({
     htmlPath,
     outputPath: rawVideo,
-    // Grabamos con 1s extra para asegurarnos de capturar el final de la animación
     durationSeconds: config.duration + 1,
-    width:  config.width  || 1280,
-    height: config.height || 800,
+    width:  config.width  || 1080,
+    height: config.height || 1080,
     onProgress: (msg) => onProgress('record', msg),
   });
 
-  // ── Paso 2: mezclar audio (y recortar el blank inicial) ───────────────────
-  onProgress('mix', 'Paso 2/2 — Mezclando audio con FFmpeg...');
-  mix({
+  const mixBase = {
     videoPath:   rawVideo,
-    outputPath:  finalMp4,
     baseDir:     path.join(baseDir, 'uploads'),
     duration:    config.duration,
-    videoOffset: blankSeconds,   // ← recorta el blank medido en el paso 1
+    videoOffset: blankSeconds,
     voice: config.voice || [],
     sfx:   config.sfx   || [],
-    onProgress: (msg) => onProgress('mix', msg),
+  };
+
+  // ── Paso 2: MP4 mobile — 1080×1920 (Story 9:16) ───────────────────────────
+  const mobileMp4 = path.join(outputDir, `${baseName}_mobile.mp4`);
+  onProgress('mix', `Paso 2/3 — Exportando ${FORMAT_MOBILE.tag}...`);
+  mix({
+    ...mixBase,
+    outputPath:   mobileMp4,
+    outputWidth:  FORMAT_MOBILE.width,
+    outputHeight: FORMAT_MOBILE.height,
+    onProgress:   (msg) => onProgress('mix', msg),
   });
 
-  // ── Limpieza ──────────────────────────────────────────────────────────────
+  // ── Paso 3: MP4 desktop — 1080×1080 (Feed cuadrado) ──────────────────────
+  const desktopMp4 = path.join(outputDir, `${baseName}_desktop.mp4`);
+  onProgress('mix', `Paso 3/3 — Exportando ${FORMAT_DESKTOP.tag}...`);
+  mix({
+    ...mixBase,
+    outputPath:   desktopMp4,
+    outputWidth:  FORMAT_DESKTOP.width,
+    outputHeight: FORMAT_DESKTOP.height,
+    onProgress:   (msg) => onProgress('mix', msg),
+  });
+
+  // ── Limpieza del raw ───────────────────────────────────────────────────────
   if (fs.existsSync(rawVideo)) fs.unlinkSync(rawVideo);
 
-  onProgress('done', `✓ Listo: ${finalMp4}`);
-  return finalMp4;
+  const mobileFile  = path.basename(mobileMp4);
+  const desktopFile = path.basename(desktopMp4);
+
+  onProgress('done', `✓ Mobile:  ${mobileFile}`);
+  onProgress('done', `✓ Desktop: ${desktopFile}`);
+
+  return { mobileFile, desktopFile };
 }
