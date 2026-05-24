@@ -1,1 +1,2 @@
 @AGENTS.md
+@COMO_FUNCIONA.md

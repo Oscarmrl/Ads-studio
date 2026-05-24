@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+﻿# Ad Studio — Generador Personal de Anuncios en Video
 
-## Getting Started
+## Inicio rapido
 
-First, run the development server:
-
-```bash
+```
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Donde se guardan los videos
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**`data/outputs/<nombre>.mp4`**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Por ejemplo: si tu HTML es `feed-1-automatiza.html` el video queda en
+`C:\Users\DELL\Escritorio\ad-studio\data\outputs\feed-1-automatiza.mp4`
 
-## Learn More
+Tambien puedes descargarlo directo desde la UI (link verde en la tarjeta del proyecto).
 
-To learn more about Next.js, take a look at the following resources:
+## Estructura
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+ad-studio/
+  public/ads/      <- HTMLs animados (iframe preview)
+  uploads/
+    voice/         <- .mp3 de voz (ElevenLabs)
+    sounds/        <- SFX / efectos .mp3
+  data/
+    projects/      <- Un JSON por proyecto
+    outputs/       <- MP4 generados aqui
+  engine/          <- Playwright + FFmpeg
+  app/             <- UI Next.js
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Configuracion ElevenLabs
 
-## Deploy on Vercel
+Edita `.env.local`:
+```
+ELEVENLABS_API_KEY=tu_key_aqui
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Importar configs del pipeline anterior
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+npm run import-configs C:\ruta\a\configs
+```

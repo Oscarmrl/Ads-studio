@@ -1,6 +1,4 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# ── Dependencias ───────────────────────────────────────────────────
 /node_modules
 /.pnp
 .pnp.*
@@ -10,32 +8,36 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
-# next.js
+# ── Next.js ────────────────────────────────────────────────────────
 /.next/
 /out/
-
-# production
 /build
 
-# misc
+# ── TypeScript ─────────────────────────────────────────────────────
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Variables de entorno ────────────────────────────────────────────
+.env*
+
+# ── Datos de runtime (generados por la app, no pertenecen al repo) ─
+/data/projects/          # Proyectos JSON (datos personales)
+/data/outputs/           # Videos MP4 generados
+
+# ── Uploads del usuario ────────────────────────────────────────────
+/uploads/voice/          # Voces AI confirmadas
+# uploads/sounds/ se versiona con .gitkeep para preservar la carpeta
+
+# ── Archivos públicos generados ────────────────────────────────────
+/public/ads/             # HTMLs subidos por el usuario
+/public/previews/        # Previews temporales de voces (se limpian solos)
+
+# ── Misc ───────────────────────────────────────────────────────────
 .DS_Store
 *.pem
-
-# debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
 .vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+/coverage
