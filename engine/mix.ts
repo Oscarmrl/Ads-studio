@@ -4,6 +4,28 @@ import ffmpegPath from 'ffmpeg-static';
 import path from 'path';
 import fs from 'fs';
 
+// ── Parámetros de calidad de video/audio ─────────────────────────────────────
+// CRF 15: casi sin pérdida visible, ideal para anuncios con texto nítido
+// slow:   búsqueda de movimiento más profunda → menos artefactos al mismo CRF
+// high/4.1: perfil H.264 compatible con IG, WhatsApp, iOS y todos los navegadores
+// yuv420p: formato de color universal — evita problemas en reproductores móviles
+// -r 30:  framerate constante 30 fps (evita saltos si el WebM varía)
+const VIDEO_CODEC_ARGS = [
+  '-c:v', 'libx264',
+  '-crf', '15',
+  '-preset', 'slow',
+  '-profile:v', 'high',
+  '-level:v', '4.1',
+  '-pix_fmt', 'yuv420p',
+  '-r', '30',
+  '-movflags', '+faststart',
+] as const;
+
+const AUDIO_CODEC_ARGS = [
+  '-c:a', 'aac',
+  '-b:a', '256k',
+] as const;
+
 export interface AudioCue {
   at: number;
   src: string;
@@ -65,8 +87,7 @@ export function mix({
     if (scaleFilter) vf.push(scaleFilter);
     if (vf.length)  args.push('-vf', vf.join(','));
     if (duration)   args.push('-t', String(duration));
-    args.push('-c:v', 'libx264', '-crf', '18', '-preset', 'fast',
-              '-movflags', '+faststart', absOutput);
+    args.push(...VIDEO_CODEC_ARGS, absOutput);
     run(args);
     return absOutput;
   }
@@ -113,9 +134,8 @@ export function mix({
     '-filter_complex', filterParts.join(';'),
     '-map', videoMapLabel,
     '-map', '[aout]',
-    '-c:v', 'libx264', '-crf', '18', '-preset', 'fast',
-    '-c:a', 'aac', '-b:a', '192k',
-    '-movflags', '+faststart',
+    ...VIDEO_CODEC_ARGS,
+    ...AUDIO_CODEC_ARGS,
   ];
   if (duration) outputArgs.push('-t', String(duration));
   outputArgs.push(absOutput);
