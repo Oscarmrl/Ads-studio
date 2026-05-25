@@ -18,6 +18,16 @@ export interface RecordResult {
   blankSeconds: number;
 }
 
+// ── Calidad de rendering ──────────────────────────────────────────────────────
+// deviceScaleFactor: 2 = modo Retina / HiDPI.
+// El viewport CSS permanece en sus dimensiones originales (p.ej. 1600×1000),
+// pero Chromium activa su pipeline de renderizado de alta densidad:
+//   • Subpixel antialiasing para texto e íconos
+//   • Curvas SVG renderizadas a resolución 2× antes de compositar
+//   • Gradientes calculados con mayor precisión
+// El video se captura igual en píxeles CSS; la ganancia es de calidad, no de tamaño.
+const DEVICE_SCALE = 2;
+
 // CSS que se inyecta en cada ad para:
 //   • eliminar márgenes / scroll del body
 //   • ocultar controles de preview (#bar)
@@ -44,7 +54,7 @@ const OVERRIDE_CSS = `
   /* SVG con position:absolute llena el stage independientemente de flexbox */
   #stage svg, #stage > svg {
     position: absolute !important;
-    inset: 0 !important;           /* top:0; right:0; bottom:0; left:0 */
+    inset: 0 !important;
     width: 100% !important; height: 100% !important;
     max-width: none !important; max-height: none !important;
     display: block !important;
@@ -66,28 +76,35 @@ export async function record({
   fs.mkdirSync(tmpDir, { recursive: true });
   fs.mkdirSync(path.dirname(absOutput), { recursive: true });
 
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    args: [
+      // Perfil de color sRGB consistente — evita shifts de color entre OS
+      '--force-color-profile=srgb',
+      // Deshabilitar throttling de FPS en headless para animaciones más suaves
+      '--disable-frame-rate-limit',
+    ],
+  });
 
   // ── t0: el contexto con recordVideo ya empieza a grabar ──────────────────
   const t0 = Date.now();
 
   const context = await browser.newContext({
-    viewport: { width, height },
-    recordVideo: { dir: tmpDir, size: { width, height } },
+    viewport:         { width, height },
+    deviceScaleFactor: DEVICE_SCALE,          // Renderizado Retina / HiDPI
+    recordVideo:      { dir: tmpDir, size: { width, height } },
   });
 
   const page = await context.newPage();
 
   const fileUrl = `file:///${absHtml.replace(/\\/g, '/')}`;
-  onProgress(`  Cargando: ${path.basename(htmlPath)}`);
+  onProgress(`  Cargando: ${path.basename(htmlPath)} (HiDPI ×${DEVICE_SCALE})`);
 
   // Esperamos 'load' — aquí arrancan las animaciones CSS y los scripts JS
   await page.goto(fileUrl, { waitUntil: 'load' });
 
   // Inyectar CSS DESPUÉS de que la página cargue:
   // • page.addStyleTag() garantiza que document.head existe y está poblado
-  // • Al ser el último <style> en <head>, gana la cascada sin necesidad de !important
-  //   (pero lo mantenemos por si el HTML usa !important propio)
+  // • Al ser el último <style> en <head>, gana la cascada
   await page.addStyleTag({ content: OVERRIDE_CSS });
 
   // Pausa para que el browser recalcule layout con el nuevo CSS
@@ -97,7 +114,7 @@ export async function record({
   const blankSeconds = (Date.now() - t0) / 1000;
   onProgress(`  Animación activa (blank inicial: ${blankSeconds.toFixed(2)}s — se recortará)`);
 
-  onProgress(`  Grabando ${durationSeconds}s a ${width}x${height}...`);
+  onProgress(`  Grabando ${durationSeconds}s a ${width}×${height} (DPR ${DEVICE_SCALE})...`);
   await page.waitForTimeout(durationSeconds * 1000);
 
   await page.close();

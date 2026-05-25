@@ -71,18 +71,34 @@ export function mix({
   const trimStart = Math.max(0, parseFloat(videoOffset.toFixed(3)));
   const hasTrim   = trimStart > 0;
 
-  // Filtro de escala + letterbox + unsharp si se especifica resolución de salida.
-  // lanczos: kernel de alta calidad para escala (mejor que bilinear/bicubic).
-  // pad:     añade barras negras para completar el formato sin deformar el contenido.
-  // unsharp: nitidez sutil post-escala (5×5 px, fuerza 0.4 solo en luma).
-  //   Compensa el suavizado que introduce cualquier operación de escala.
-  //   0.0 en chroma evita color fringing en bordes de texto.
+  // Filtro de escala + letterbox + nitidez + deband.
+  //
+  // scale flags:
+  //   lanczos           — kernel de resampling de alta calidad
+  //   accurate_rnd      — redondeo preciso en el cálculo del kernel (menos aliasing)
+  //   full_chroma_int   — interpola chroma con la misma precisión que luma
+  //   full_chroma_inp   — usa chroma input completo (sin submuestreo previo)
+  //
+  // unsharp=5:5:0.4:5:5:0.0
+  //   — nitidez post-escala solo en luma (chroma=0 evita color fringing en texto)
+  //   — fuerza 0.4: visible pero sin halos
+  //
+  // deband=1thr=0.06:2thr=0.06:3thr=0.06:4thr=0.06:range=16:blur=false
+  //   — elimina el banding (bandas de color) que aparece en gradientes suaves
+  //     al convertir a yuv420p; especialmente visible en fondos oscuros sólidos
+  //   — blur=false usa dithering en lugar de blur (preserva detalle fino)
   const hasScale = !!(outputWidth && outputHeight);
   const scaleFilter = hasScale
     ? [
-        `scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos`,
+        [
+          `scale=${outputWidth}:${outputHeight}`,
+          `force_original_aspect_ratio=decrease`,
+          `force_divisible_by=2`,
+          `flags=lanczos+accurate_rnd+full_chroma_int+full_chroma_inp`,
+        ].join(':'),
         `pad=${outputWidth}:${outputHeight}:(ow-iw)/2:(oh-ih)/2:color=black`,
         `unsharp=5:5:0.4:5:5:0.0`,
+        `deband=1thr=0.06:2thr=0.06:3thr=0.06:4thr=0.06:range=16:blur=false`,
       ].join(',')
     : null;
 
