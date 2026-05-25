@@ -48,10 +48,29 @@ export async function record({
   await page.addInitScript(() => {
     const style = document.createElement('style');
     style.textContent = `
-      body, html { margin: 0; padding: 0; overflow: hidden; }
-      #stage { width: 100vw !important; height: 100vh !important; }
-      #stage svg { width: 100% !important; height: 100% !important;
-                   max-width: none !important; max-height: none !important; }
+      /* Reset base */
+      body, html {
+        margin: 0 !important; padding: 0 !important;
+        overflow: hidden !important;
+        width: 100vw !important; height: 100vh !important;
+      }
+      /* Ocultar controles de preview que no son parte del anuncio */
+      #bar, .preview-bar, [class*="control-bar"] {
+        display: none !important;
+      }
+      /* Stage: llenar todo el viewport sin restricciones */
+      #stage {
+        width: 100vw !important; height: 100vh !important;
+        max-width: none !important; max-height: none !important;
+        flex: none !important;
+        position: relative !important;
+      }
+      /* SVG: llenar el stage sin caps de tamaño */
+      #stage svg, #stage > svg {
+        width: 100% !important; height: 100% !important;
+        max-width: none !important; max-height: none !important;
+        display: block !important;
+      }
     `;
     document.head.appendChild(style);
   });

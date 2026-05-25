@@ -12,11 +12,12 @@ export function parseHtmlMeta(html: string): HtmlMeta {
   // ── 1. Dimensiones del body/html ─────────────────────────────────────────
   // Busca: html, body { width: 360px; height: 480px; }
   // o variantes: body { width:270px; height:480px }
-  let width = 1080;
-  let height = 1080;
+  let width = 0;
+  let height = 0;
 
+  // ── Estrategia 1: html/body con dimensiones fijas en px ─────────────────
+  // Ejemplo: html, body { width: 270px; height: 480px; }
   const dimPatterns = [
-    // html, body { ...width: Xpx...height: Ypx... }
     /html\s*,\s*body\s*\{([^}]+)\}/,
     /body\s*,\s*html\s*\{([^}]+)\}/,
     /body\s*\{([^}]+)\}/,
@@ -32,6 +33,21 @@ export function parseHtmlMeta(html: string): HtmlMeta {
       if (w || h) break;
     }
   }
+
+  // ── Estrategia 2: SVG con viewBox (ads tipo #stage svg) ─────────────────
+  // Ejemplo: <svg viewBox="0 0 800 500" ...>
+  // Indica las dimensiones naturales del contenido animado
+  if (!width || !height) {
+    const vb = html.match(/<svg[^>]+viewBox=["']\s*0\s+0\s+(\d+)\s+(\d+)\s*["']/i);
+    if (vb) {
+      width  = parseInt(vb[1]);
+      height = parseInt(vb[2]);
+    }
+  }
+
+  // ── Fallback si no se detectó nada ──────────────────────────────────────
+  if (!width)  width  = 1080;
+  if (!height) height = 1080;
 
   // ── 2. Duración: estrategias en orden de confianza ───────────────────────
 
