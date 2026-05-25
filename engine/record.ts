@@ -18,6 +18,39 @@ export interface RecordResult {
   blankSeconds: number;
 }
 
+// CSS que se inyecta en cada ad para:
+//   • eliminar márgenes / scroll del body
+//   • ocultar controles de preview (#bar)
+//   • forzar que #stage llene 100 % del viewport
+//   • forzar que el SVG dentro de #stage llene 100 % del stage
+//     (usando position:absolute para evitar problemas de flexbox con height:100%)
+const OVERRIDE_CSS = `
+  body, html {
+    margin: 0 !important; padding: 0 !important;
+    overflow: hidden !important;
+    width: 100vw !important; height: 100vh !important;
+  }
+  /* Controles de preview — no deben aparecer en el video */
+  #bar, .preview-bar, [class*="control-bar"] {
+    display: none !important;
+  }
+  /* Stage ocupa todo el viewport */
+  #stage {
+    position: relative !important;
+    width: 100vw !important; height: 100vh !important;
+    max-width: none !important; max-height: none !important;
+    flex: none !important;
+  }
+  /* SVG con position:absolute llena el stage independientemente de flexbox */
+  #stage svg, #stage > svg {
+    position: absolute !important;
+    inset: 0 !important;           /* top:0; right:0; bottom:0; left:0 */
+    width: 100% !important; height: 100% !important;
+    max-width: none !important; max-height: none !important;
+    display: block !important;
+  }
+`;
+
 export async function record({
   htmlPath,
   outputPath,
@@ -45,46 +78,22 @@ export async function record({
 
   const page = await context.newPage();
 
-  await page.addInitScript(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      /* Reset base */
-      body, html {
-        margin: 0 !important; padding: 0 !important;
-        overflow: hidden !important;
-        width: 100vw !important; height: 100vh !important;
-      }
-      /* Ocultar controles de preview que no son parte del anuncio */
-      #bar, .preview-bar, [class*="control-bar"] {
-        display: none !important;
-      }
-      /* Stage: llenar todo el viewport sin restricciones */
-      #stage {
-        width: 100vw !important; height: 100vh !important;
-        max-width: none !important; max-height: none !important;
-        flex: none !important;
-        position: relative !important;
-      }
-      /* SVG: llenar el stage sin caps de tamaño */
-      #stage svg, #stage > svg {
-        width: 100% !important; height: 100% !important;
-        max-width: none !important; max-height: none !important;
-        display: block !important;
-      }
-    `;
-    document.head.appendChild(style);
-  });
-
   const fileUrl = `file:///${absHtml.replace(/\\/g, '/')}`;
   onProgress(`  Cargando: ${path.basename(htmlPath)}`);
 
   // Esperamos 'load' — aquí arrancan las animaciones CSS y los scripts JS
   await page.goto(fileUrl, { waitUntil: 'load' });
 
-  // Pausa mínima para que los handlers asíncronos del load terminen
-  await page.waitForTimeout(5);
+  // Inyectar CSS DESPUÉS de que la página cargue:
+  // • page.addStyleTag() garantiza que document.head existe y está poblado
+  // • Al ser el último <style> en <head>, gana la cascada sin necesidad de !important
+  //   (pero lo mantenemos por si el HTML usa !important propio)
+  await page.addStyleTag({ content: OVERRIDE_CSS });
 
-  // ── Blank medido: desde que empezó a grabar hasta que la animación arrancó
+  // Pausa para que el browser recalcule layout con el nuevo CSS
+  await page.waitForTimeout(80);
+
+  // ── Blank medido: desde que empezó a grabar hasta ahora
   const blankSeconds = (Date.now() - t0) / 1000;
   onProgress(`  Animación activa (blank inicial: ${blankSeconds.toFixed(2)}s — se recortará)`);
 

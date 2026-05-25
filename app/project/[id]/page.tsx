@@ -569,7 +569,7 @@ export default function ProjectEditor({ params }: { params: Promise<{ id: string
                         dark
                       />
                     )}
-                    {/* Desktop output — 1080×1080 */}
+                    {/* Desktop output — 1920×1080 */}
                     {render.desktopFile && (
                       <VideoPlayer
                         src={`/api/outputs/${render.desktopFile}`}
@@ -996,10 +996,10 @@ function VideoPlayer({ src, filename, label, dims, dark }: {
   src: string; filename: string;
   label?: string; dims?: string; dark?: boolean;
 }) {
-  // Detecta aspect ratio del nombre: _mobile = 9:16, _desktop = 1:1
+  // Detecta aspect ratio del nombre: _mobile = 9:16, _desktop = 16:9
   const aspect = filename.includes('_mobile') ? '9 / 16'
-               : filename.includes('_desktop') ? '1 / 1'
-               : '1 / 1';
+               : filename.includes('_desktop') ? '16 / 9'
+               : '16 / 9';
 
   const bg = dark ? '#1E1E1E' : '#000';
   const borderColor = dark ? '#2A2A2A' : '#111';

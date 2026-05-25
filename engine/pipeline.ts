@@ -6,8 +6,10 @@ import { mix } from './mix';
 import type { AudioCue } from './mix';
 
 // Resoluciones estándar de exportación
+// Mobile  9:16  → Stories, Reels, TikTok
+// Desktop 16:9  → YouTube, Facebook, LinkedIn, presentaciones
 const FORMAT_MOBILE  = { width: 1080, height: 1920, label: 'mobile',  tag: '📱 1080×1920' };
-const FORMAT_DESKTOP = { width: 1080, height: 1080, label: 'desktop', tag: '🖥️ 1080×1080' };
+const FORMAT_DESKTOP = { width: 1920, height: 1080, label: 'desktop', tag: '🖥️ 1920×1080' };
 
 export interface PipelineConfig {
   html: string;       // ruta al HTML (relativa al baseDir o absoluta)
@@ -19,8 +21,8 @@ export interface PipelineConfig {
 }
 
 export interface PipelineResult {
-  mobileFile: string;   // nombre del MP4 mobile  (1080×1920)
-  desktopFile: string;  // nombre del MP4 desktop (1080×1080)
+  mobileFile: string;   // nombre del MP4 mobile  (1080×1920  — Stories / Reels)
+  desktopFile: string;  // nombre del MP4 desktop (1920×1080  — YouTube / FB / LI)
 }
 
 export interface PipelineOptions {
@@ -83,7 +85,7 @@ export async function runPipeline({
     onProgress:   (msg) => onProgress('mix', msg),
   });
 
-  // ── Paso 3: MP4 desktop — 1080×1080 (Feed cuadrado) ──────────────────────
+  // ── Paso 3: MP4 desktop — 1920×1080 (16:9 horizontal) ───────────────────
   const desktopMp4 = path.join(outputDir, `${baseName}_desktop.mp4`);
   onProgress('mix', `Paso 3/3 — Exportando ${FORMAT_DESKTOP.tag}...`);
   mix({
