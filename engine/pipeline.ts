@@ -52,16 +52,24 @@ export async function runPipeline({
   onProgress('info', `  Voz: ${(config.voice || []).length} pistas | SFX: ${(config.sfx || []).length} cues`);
   onProgress('info', `  Tamaño fuente: ${config.width || 1080}×${config.height || 1080}px`);
 
-  // ── Paso 1: grabar en las dimensiones nativas del HTML ─────────────────────
-  // Grabando al tamaño exacto del HTML garantiza que la animación llene
-  // el viewport completamente sin barras negras. FFmpeg escala después.
+  // ── Paso 1: grabar en 2× las dimensiones nativas (supersampling) ───────────
+  // Playwright graba a doble resolución → el browser renderiza con mayor fidelidad.
+  // FFmpeg luego escala hacia abajo (p.ej. 1600×1000 → 1920×1080), lo que produce
+  // texto y bordes notablemente más nítidos que subir desde resolución nativa.
+  // Cap en 3840px para evitar consumo excesivo de memoria en displays muy grandes.
+  const srcW = config.width  || 1080;
+  const srcH = config.height || 1080;
+  const recordW = Math.min(srcW * 2, 3840);
+  const recordH = Math.min(srcH * 2, 3840);
+
   onProgress('record', 'Paso 1/3 — Grabando video con Playwright...');
+  onProgress('record', `  Supersampling: ${srcW}×${srcH} → grabando a ${recordW}×${recordH}`);
   const { blankSeconds } = await record({
     htmlPath,
     outputPath: rawVideo,
     durationSeconds: config.duration + 1,
-    width:  config.width  || 1080,
-    height: config.height || 1080,
+    width:  recordW,
+    height: recordH,
     onProgress: (msg) => onProgress('record', msg),
   });
 

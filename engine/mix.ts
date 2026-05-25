@@ -5,11 +5,13 @@ import path from 'path';
 import fs from 'fs';
 
 // ── Parámetros de calidad de video/audio ─────────────────────────────────────
-// CRF 15: casi sin pérdida visible, ideal para anuncios con texto nítido
-// slow:   búsqueda de movimiento más profunda → menos artefactos al mismo CRF
-// high/4.1: perfil H.264 compatible con IG, WhatsApp, iOS y todos los navegadores
-// yuv420p: formato de color universal — evita problemas en reproductores móviles
-// -r 30:  framerate constante 30 fps (evita saltos si el WebM varía)
+// CRF 15:    casi sin pérdida visible, ideal para anuncios con texto nítido
+// slow:      búsqueda de movimiento más profunda → menos artefactos al mismo CRF
+// high/4.1:  perfil H.264 compatible con IG, WhatsApp, iOS y todos los navegadores
+// yuv420p:   formato de color universal — evita problemas en reproductores móviles
+// -r 30:     framerate constante 30 fps (evita saltos si el WebM varía)
+// bt709:     espacio de color estándar para web/HD — asegura colores correctos
+//            en reproductores de iOS, macOS, YouTube y redes sociales
 const VIDEO_CODEC_ARGS = [
   '-c:v', 'libx264',
   '-crf', '15',
@@ -18,6 +20,9 @@ const VIDEO_CODEC_ARGS = [
   '-level:v', '4.1',
   '-pix_fmt', 'yuv420p',
   '-r', '30',
+  '-colorspace', 'bt709',
+  '-color_primaries', 'bt709',
+  '-color_trc', 'bt709',
   '-movflags', '+faststart',
 ] as const;
 
@@ -66,11 +71,19 @@ export function mix({
   const trimStart = Math.max(0, parseFloat(videoOffset.toFixed(3)));
   const hasTrim   = trimStart > 0;
 
-  // Filtro de escala + letterbox si se especifica resolución de salida
-  // lanczos para upscale de calidad; force_original_aspect_ratio=decrease + pad = letterbox sin deformar
+  // Filtro de escala + letterbox + unsharp si se especifica resolución de salida.
+  // lanczos: kernel de alta calidad para escala (mejor que bilinear/bicubic).
+  // pad:     añade barras negras para completar el formato sin deformar el contenido.
+  // unsharp: nitidez sutil post-escala (5×5 px, fuerza 0.4 solo en luma).
+  //   Compensa el suavizado que introduce cualquier operación de escala.
+  //   0.0 en chroma evita color fringing en bordes de texto.
   const hasScale = !!(outputWidth && outputHeight);
   const scaleFilter = hasScale
-    ? `scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,pad=${outputWidth}:${outputHeight}:(ow-iw)/2:(oh-ih)/2:color=black`
+    ? [
+        `scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos`,
+        `pad=${outputWidth}:${outputHeight}:(ow-iw)/2:(oh-ih)/2:color=black`,
+        `unsharp=5:5:0.4:5:5:0.0`,
+      ].join(',')
     : null;
 
   const allCues = [
